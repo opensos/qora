@@ -1,6 +1,8 @@
 # Qora
 
-Penjana QR pautan statik yang privasi-dahulu. Semua penjanaan berlaku di dalam pelayar.
+Penjana QR statik yang privasi-dahulu. Semua penjanaan berlaku di dalam pelayar.
+
+QR pautan terus menuju URL asal. Servis pemendek pautan adalah fungsi berasingan dan memerlukan Cloudflare KV binding bernama `SHORT_URLS`.
 
 ## Pembangunan
 
