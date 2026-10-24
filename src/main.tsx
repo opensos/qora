@@ -1,63 +1,69 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { Check, Copy, Download, Link2, QrCode } from 'lucide-react'
 import { createRoot } from 'react-dom/client'
 import QRCode from 'qrcode'
-import { Check, Download, LockKeyhole, QrCode, RotateCcw } from 'lucide-react'
 import './index.css'
 
+type Mode = 'qr' | 'shorten'
+
 function App() {
-  const [link, setLink] = useState('https://qora.pahang.dev')
-  const [shortenLink, setShortenLink] = useState('')
-  const [shortUrl, setShortUrl] = useState('')
-  const [shortenError, setShortenError] = useState('')
-  const [shortening, setShortening] = useState(false)
-  const [foreground, setForeground] = useState('#18181b')
-  const [background, setBackground] = useState('#ffffff')
-  const [margin, setMargin] = useState(2)
-  const [errorLevel, setErrorLevel] = useState<'L' | 'M' | 'Q' | 'H'>('M')
+  const [mode, setMode] = useState<Mode>('qr')
+  const [url, setUrl] = useState('')
   const [svg, setSvg] = useState('')
+  const [shortUrl, setShortUrl] = useState('')
+  const [error, setError] = useState('')
+  const [working, setWorking] = useState(false)
   const [copied, setCopied] = useState(false)
-  const svgRef = useRef<HTMLDivElement>(null)
-  const content = link.trim() || 'https://qora.pahang.dev'
 
   useEffect(() => {
-    QRCode.toString(content, { type: 'svg', errorCorrectionLevel: errorLevel, margin, color: { dark: foreground, light: background } }).then(setSvg)
-  }, [content, foreground, background, margin, errorLevel])
+    if (mode !== 'qr' || !url.trim()) { setSvg(''); return }
+    QRCode.toString(url.trim(), { type: 'svg', errorCorrectionLevel: 'M', margin: 2, color: { dark: '#111111', light: '#ffffff' } }).then(setSvg)
+  }, [mode, url])
 
-  const download = async (format: 'svg' | 'png') => {
-    const data = format === 'svg' ? svg : await QRCode.toDataURL(content, { width: 1600, errorCorrectionLevel: errorLevel, margin, color: { dark: foreground, light: background } })
-    const url = format === 'svg' ? URL.createObjectURL(new Blob([data], { type: 'image/svg+xml' })) : data
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = `qora-link.${format}`
-    anchor.click()
-    if (format === 'svg') URL.revokeObjectURL(url)
+  const copy = async (value: string) => {
+    await navigator.clipboard.writeText(value)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
   }
 
-  const resetStyle = () => { setForeground('#18181b'); setBackground('#ffffff'); setMargin(2); setErrorLevel('M') }
+  const download = async (format: 'svg' | 'png') => {
+    if (!url.trim()) return
+    const value = url.trim()
+    const data = format === 'svg' ? svg : await QRCode.toDataURL(value, { width: 1600, errorCorrectionLevel: 'M', margin: 2 })
+    const href = format === 'svg' ? URL.createObjectURL(new Blob([data], { type: 'image/svg+xml' })) : data
+    const anchor = document.createElement('a')
+    anchor.href = href
+    anchor.download = `qora-qr.${format}`
+    anchor.click()
+    if (format === 'svg') URL.revokeObjectURL(href)
+  }
+
   const shorten = async () => {
-    setShortenError('')
+    setError('')
     setShortUrl('')
-    setShortening(true)
+    setWorking(true)
     try {
-      const response = await fetch('/api/shorten', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: shortenLink }) })
+      const response = await fetch('/api/shorten', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) })
       const data = await response.json() as { shortUrl?: string; error?: string }
       if (!response.ok || !data.shortUrl) throw new Error(data.error || 'Tidak dapat memendekkan pautan.')
       setShortUrl(data.shortUrl)
-    } catch (error) {
-      setShortenError(error instanceof Error ? error.message : 'Tidak dapat memendekkan pautan.')
-    } finally { setShortening(false) }
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Tidak dapat memendekkan pautan.') } finally { setWorking(false) }
   }
 
-  return <main className="min-h-screen bg-[#f7f7f2] text-zinc-900"><div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 sm:py-7 md:px-8 md:py-9">
-    <header className="flex items-center justify-between"><a className="flex items-center gap-2 text-xl font-black tracking-tight" href="/"><span className="grid h-9 w-9 place-items-center rounded-xl bg-zinc-900 text-white"><QrCode size={20}/></span>qora</a><span className="hidden items-center gap-2 text-sm text-zinc-500 sm:flex"><LockKeyhole size={15}/> 100% dalam pelayar</span></header>
-    <section className="mb-7 mt-10 max-w-2xl sm:mb-8 sm:mt-14"><p className="mb-3 text-xs font-bold uppercase tracking-[.16em] text-emerald-700 sm:text-sm sm:tracking-[.18em]">Penjana QR pautan percuma</p><h1 className="text-4xl font-black leading-tight tracking-tight sm:text-5xl">QR pautan, terus siap.</h1><p className="mt-4 text-base leading-relaxed text-zinc-600 sm:text-lg">Cipta, ubah suai dan muat turun kod QR untuk pautan anda tanpa akaun. Data anda tidak pernah meninggalkan peranti ini.</p></section>
-    <div className="grid gap-5 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start"><section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-zinc-200 sm:p-7">
-      <h2 className="text-lg font-bold">1. Masukkan pautan</h2><div className="mt-4 grid gap-2"><label className="text-sm font-medium" htmlFor="url">URL laman web</label><input id="url" type="url" value={link} onChange={event => setLink(event.target.value)} placeholder="https://contoh.my" className="h-12 rounded-xl border border-zinc-200 bg-zinc-50 px-4 outline-none transition focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100" /></div>
-      <div className="mt-8 border-t border-zinc-100 pt-6"><div className="flex items-center justify-between"><h2 className="font-bold">2. Gaya</h2><button onClick={resetStyle} className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-zinc-500 hover:text-zinc-900"><RotateCcw size={14}/> Reset</button></div><div className="mt-4 grid gap-4 md:grid-cols-2"><label className="text-sm font-medium">Warna kod <span className="mt-2 flex h-12 items-center gap-3 rounded-xl border border-zinc-200 px-3"><input aria-label="Warna kod" type="color" value={foreground} onChange={event => setForeground(event.target.value)} className="h-7 w-7 cursor-pointer border-0 bg-transparent p-0"/><code className="text-zinc-500">{foreground}</code></span></label><label className="text-sm font-medium">Latar belakang <span className="mt-2 flex h-12 items-center gap-3 rounded-xl border border-zinc-200 px-3"><input aria-label="Latar belakang" type="color" value={background} onChange={event => setBackground(event.target.value)} className="h-7 w-7 cursor-pointer border-0 bg-transparent p-0"/><code className="text-zinc-500">{background}</code></span></label><label className="text-sm font-medium">Ruang tepi<select value={margin} onChange={event => setMargin(Number(event.target.value))} className="mt-2 h-12 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3"><option value="0">Tiada</option><option value="2">Sederhana</option><option value="4">Luas</option></select></label><label className="text-sm font-medium">Pembetulan ralat<select value={errorLevel} onChange={event => setErrorLevel(event.target.value as typeof errorLevel)} className="mt-2 h-12 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3"><option value="L">Rendah</option><option value="M">Sederhana</option><option value="Q">Tinggi</option><option value="H">Sangat tinggi</option></select></label></div></div>
-      <div className="mt-8 border-t border-zinc-100 pt-6"><h2 className="font-bold">Servis pemendek pautan</h2><p className="mt-1 text-sm text-zinc-500">Cipta pautan pendek berasingan. Ini tidak mengubah QR di sebelah.</p><div className="mt-4 flex flex-col gap-2 sm:flex-row"><input type="url" value={shortenLink} onChange={event => setShortenLink(event.target.value)} placeholder="https://pautan-panjang-contoh.my/..." className="h-12 min-w-0 flex-1 rounded-xl border border-zinc-200 bg-zinc-50 px-4 outline-none transition focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100" /><button disabled={shortening} onClick={shorten} className="btn shrink-0 bg-zinc-900 px-5 text-white disabled:cursor-wait disabled:opacity-60">{shortening ? 'Memendekkan…' : 'Pendekkan'}</button></div>{shortUrl && <p className="mt-3 break-all rounded-xl bg-emerald-50 px-4 py-3 font-mono text-sm text-emerald-800">{shortUrl}</p>}{shortenError && <p role="alert" className="mt-3 text-sm text-red-700">{shortenError}</p>}</div>
-    </section><aside className="rounded-3xl bg-zinc-900 p-5 text-white shadow-xl sm:p-8 lg:sticky lg:top-6"><p className="text-sm font-bold uppercase tracking-[.16em] text-emerald-400">Live preview</p><div ref={svgRef} className="mx-auto mt-5 grid aspect-square w-full max-w-sm place-items-center overflow-hidden rounded-2xl bg-white p-4 sm:p-5" dangerouslySetInnerHTML={{ __html: svg }} /><p className="mt-5 break-all rounded-xl bg-white/10 px-3 py-2 font-mono text-xs leading-relaxed text-zinc-300">{content}</p><div className="mt-5 grid gap-3 sm:grid-cols-2"><button onClick={() => download('png')} className="btn bg-emerald-400 text-zinc-950 hover:bg-emerald-300"><Download size={17}/> PNG</button><button onClick={() => download('svg')} className="btn bg-white text-zinc-950 hover:bg-zinc-200"><Download size={17}/> SVG</button></div><button onClick={async () => { await navigator.clipboard.writeText(content); setCopied(true); setTimeout(() => setCopied(false), 1500) }} className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 text-sm text-zinc-300 hover:text-white">{copied ? <><Check size={15}/> Disalin</> : 'Salin pautan'}</button></aside></div>
-    <footer className="py-12 text-center text-sm text-zinc-500">Qora menjana QR pautan secara setempat — tiada penjejakan, tiada akaun.</footer>
-  </div></main>
+  const selectMode = (next: Mode) => { setMode(next); setError(''); setShortUrl('') }
+  const label = mode === 'qr' ? 'tampal pautan untuk jana QR' : 'tampal pautan untuk pendekkan'
+
+  return <main className="min-h-screen bg-white text-zinc-950"><header className="border-b border-zinc-100"><div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-5"><a href="/" className="flex items-center gap-2 text-sm font-semibold tracking-tight"><span className="grid h-7 w-7 place-items-center rounded-md bg-zinc-950 text-white"><QrCode size={16}/></span>qora</a><span className="text-xs text-zinc-400">privacy-first</span></div></header>
+    <section className="mx-auto flex min-h-[calc(100vh-65px)] max-w-5xl flex-col items-center justify-center px-5 py-16 text-center sm:py-20">
+      <div className="grid h-20 w-20 place-items-center rounded-[2rem] border border-zinc-200 text-zinc-950 sm:h-24 sm:w-24"><QrCode size={48} strokeWidth={1.4}/></div>
+      <h1 className="mt-7 text-3xl font-semibold tracking-[-.05em] sm:text-5xl">Pautan, dipermudah.</h1>
+      <p className="mt-3 max-w-md text-sm leading-relaxed text-zinc-500 sm:text-base">Jana QR secara terus atau pendekkan pautan anda. Tanpa akaun, tanpa penjejakan.</p>
+      <div className="mt-8 flex rounded-xl border border-zinc-200 bg-zinc-50 p-1 text-sm font-medium"><button onClick={() => selectMode('qr')} className={`rounded-lg px-4 py-2 transition ${mode === 'qr' ? 'bg-white text-zinc-950 shadow-sm' : 'text-zinc-500 hover:text-zinc-950'}`}>Jana QR</button><button onClick={() => selectMode('shorten')} className={`rounded-lg px-4 py-2 transition ${mode === 'shorten' ? 'bg-white text-zinc-950 shadow-sm' : 'text-zinc-500 hover:text-zinc-950'}`}>Pendekkan</button></div>
+      <div className="mt-5 flex w-full max-w-xl flex-col gap-2 sm:flex-row"><label className="sr-only" htmlFor="url">Pautan</label><div className="flex min-w-0 flex-1 items-center gap-3 rounded-xl border border-zinc-300 bg-white px-4 shadow-sm transition focus-within:border-zinc-950 focus-within:ring-4 focus-within:ring-zinc-100"><Link2 size={18} className="shrink-0 text-zinc-400"/><input id="url" type="url" value={url} onChange={event => setUrl(event.target.value)} placeholder={label} className="h-14 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-zinc-400" /></div>{mode === 'shorten' && <button onClick={shorten} disabled={working || !url.trim()} className="h-14 rounded-xl bg-zinc-950 px-6 text-sm font-semibold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40">{working ? 'Memproses…' : 'Pendekkan'}</button>}</div>
+      {mode === 'qr' && svg && <div className="mt-8 w-full max-w-xl"><div className="mx-auto grid w-full max-w-xs place-items-center rounded-2xl border border-zinc-200 bg-white p-5" dangerouslySetInnerHTML={{ __html: svg }} /><div className="mt-4 flex justify-center gap-2"><button onClick={() => download('png')} className="action"><Download size={15}/> PNG</button><button onClick={() => download('svg')} className="action"><Download size={15}/> SVG</button><button onClick={() => copy(url.trim())} className="action">{copied ? <><Check size={15}/> disalin</> : <><Copy size={15}/> salin</>}</button></div><p className="mt-4 break-all font-mono text-xs text-zinc-400">{url.trim()}</p></div>}
+      {mode === 'shorten' && <div className="mt-6 w-full max-w-xl">{shortUrl && <div className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-left"><Link2 size={18} className="shrink-0 text-zinc-400"/><p className="min-w-0 flex-1 break-all font-mono text-sm">{shortUrl}</p><button onClick={() => copy(shortUrl)} className="action shrink-0">{copied ? <Check size={15}/> : <Copy size={15}/>}</button></div>}{error && <p role="alert" className="mt-3 text-sm text-red-600">{error}</p>}<p className="mt-5 text-xs text-zinc-400">QR anda kekal terus ke URL asal. Pemendek pautan ialah servis berasingan.</p></div>}
+    </section>
+  </main>
 }
 
 createRoot(document.getElementById('root')!).render(<App />)
