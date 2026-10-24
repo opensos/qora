@@ -1,6 +1,6 @@
 # Qora
 
-Penjana QR statik yang privasi-dahulu. Semua penjanaan berlaku di dalam pelayar.
+Penjana QR pautan statik yang privasi-dahulu. Semua penjanaan berlaku di dalam pelayar.
 
 ## Pembangunan
 
