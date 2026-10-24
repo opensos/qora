@@ -1,3 +1,7 @@
 name = "qora"
 pages_build_output_dir = "build"
 compatibility_date = "2026-10-24"
+
+[[kv_namespaces]]
+binding = "SHORT_URLS"
+id = "daffedb923c94fb19d7642043c796368"
