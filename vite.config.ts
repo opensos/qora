@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite'
+import { sveltekit } from '@sveltejs/kit/vite'
+import adapter from '@sveltejs/adapter-static'
 
-export default defineConfig({ plugins: [react(), tailwindcss()] })
+export default defineConfig({ plugins: [sveltekit({ adapter: adapter({ fallback: '200.html' }) })] })
