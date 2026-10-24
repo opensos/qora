@@ -8,6 +8,7 @@ function code() {
 }
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
+  if (!env.SHORT_URLS) return Response.json({ error: 'Servis pemendek belum dikonfigurasi. Tambah KV binding bernama SHORT_URLS di Cloudflare Pages.' }, { status: 503 })
   let input: unknown
   try { input = await request.json() } catch { return Response.json({ error: 'Permintaan tidak sah.' }, { status: 400 }) }
   const value = typeof input === 'object' && input !== null && 'url' in input ? (input as { url?: unknown }).url : undefined
